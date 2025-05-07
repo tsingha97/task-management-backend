@@ -5,41 +5,44 @@ const cors = require("cors");
 const userRoutes = require("./routes/userRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 
-// parse comma‑separated origins, trimming whitespace
+const app = express();
+
+//Setup CORS from environment variable
 const rawOrigins = process.env.CORS_ORIGINS || "";
 const allowedOrigins = rawOrigins
   .split(",")
-  .map((url) => url.trim())
-  .filter((url) => url.length);
-
-const app = express();
+  .map((origin) => origin.trim())
+  .filter(Boolean); // remove empty strings
 
 app.use(
   cors({
-    origin: (incomingOrigin, callback) => {
-      // allow requests with no origin (like mobile apps or curl)
-      if (!incomingOrigin) return callback(null, true);
-
-      if (allowedOrigins.includes(incomingOrigin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS policy denies access from ${incomingOrigin}`));
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g., mobile apps, curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
       }
+      return callback(new Error(`CORS policy denied access from ${origin}`));
     },
     credentials: true,
   })
 );
 
+//Body parser middleware
 app.use(express.json());
 
+//Routes
 app.use("/api/users", userRoutes);
 app.use("/api/tasks", taskRoutes);
 
+//Connect to MongoDB and start server
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() =>
+  .then(() => {
     app.listen(process.env.PORT, () =>
-      console.log(`Server running on port ${process.env.PORT}`)
-    )
-  )
-  .catch((err) => console.error(err));
+      console.log(`✅ Server running on port ${process.env.PORT}`)
+    );
+  })
+  .catch((err) => {
+    console.error("❌ MongoDB connection failed:", err);
+  });
